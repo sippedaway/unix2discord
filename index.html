@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <style>
+    :root {
+      --bg: #121212;
+      --surface: #1e1e1e;
+      --surface-alt: #2a2a2a;
+      --border: #393939;
+      --text: #e0e0e0;
+      --muted: #555;
+      --accent: #3b82f6;
+      --hover: #1e1e1e;
+      --invalid: #777;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+    }
+    .container {
+      padding: 3rem;
+      background: var(--surface);
+      border-radius: 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    input {
+      height: 2.75rem;
+      padding: 0 0.75rem;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+      font-family: 'Inter';
+    }
+    input:focus { border-color: var(--accent); }
+    .placeholder-date {
+      height: 1rem;
+      font-size: 0.875rem;
+      color: var(--muted);
+      user-select: none;
+    }
+    .ts-item {
+      min-height: 3rem;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+      user-select: none;
+      width: 350px;
+    }
+    .ts-item:hover {
+      background: var(--hover);
+      border-color: var(--accent);
+    }
+    .ts-item.invalid {
+      color: var(--invalid);
+      background: var(--surface);
+      border-color: var(--surface);
+      cursor: default;
+    }
+    #ts-main {
+        width: 100%;
+        margin-top: 5rem;
+    }
+    .ts-item.invalid i { color: var(--invalid); }
+    .ts-item i {
+      margin-left: 0.5rem;
+      transition: transform 0.2s, color 0.2s;
+    }
+    .ts-item:hover i { transform: scale(1.1); }
+    .ts-item.copied i { color: #22c55e; }
+
+    #discord-list .ts-item.invalid {
+        opacity: 0;
+    }
+    #discord-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.5rem;
+      visibility: visible;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <input id="dt-input" placeholder="MM/DD/YYYY" autocomplete="off" />
+    <div id="date-ph" class="placeholder-date"></div>
+    <div id="ts-main" class="ts-item">
+      <span class="label"></span><i class="fas fa-copy"></i>
+    </div>
+    <div id="discord-list"></div>
+  </div>
+  <script>
+    const input = document.getElementById('dt-input');
+    const datePh = document.getElementById('date-ph');
+    const tsMain = document.getElementById('ts-main');
+    const discordList = document.getElementById('discord-list');
+
+    const formats = [
+      { suffix: '', opts: { year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'numeric' } },
+      { suffix: 't', opts: { hour:'numeric', minute:'numeric' } },
+      { suffix: 'T', opts: { hour:'numeric', minute:'numeric', second:'numeric' } },
+      { suffix: 'd', opts: { year:'numeric', month:'2-digit', day:'2-digit' } },
+      { suffix: 'D', opts: { year:'numeric', month:'long', day:'numeric' } },
+      { suffix: 'f', opts: { year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'numeric' } },
+      { suffix: 'F', opts: { weekday:'long', year:'numeric', month:'long', day:'numeric', hour:'numeric', minute:'numeric' } },
+      { suffix: 'R' }
+    ];
+
+    function pad(n){ return n.toString().padStart(2,'0'); }
+    function formatDate(d){
+      return pad(d.getMonth()+1)+'/'+pad(d.getDate())+'/'+d.getFullYear();
+    }
+    function parseDate(str){
+      const re = /^\s*(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?(?:\s+(\d{1,2})(?::(\d{2})(?::(\d{2}))?)?\s*(am|pm)?)?\s*$/i;
+      const m = str.match(re);
+      if(!m) return null;
+      let [,mm,dd,yy,hh,mi,ss,ap] = m;
+      const now = new Date();
+      const year = yy ? +yy : now.getFullYear();
+      let h = hh ? +hh : 0;
+      const minute = mi ? +mi : 0;
+      const second = ss ? +ss : 0;
+      if(ap){
+        ap = ap.toLowerCase();
+        if(ap==='pm'&&h<12) h+=12;
+        if(ap==='am'&&h===12) h=0;
+      }
+      const d = new Date(year, +mm-1, +dd, h, minute, second);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    function getRelativeTime(date){
+      const now = new Date();
+      const diff = Math.round((date - now)/1000);
+      const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+      const abs = Math.abs(diff);
+      if(abs<60) return rtf.format(diff, 'second');
+      const mins = Math.round(diff/60);
+      if(Math.abs(mins)<60) return rtf.format(mins, 'minute');
+      const hrs = Math.round(diff/3600);
+      if(Math.abs(hrs)<24) return rtf.format(hrs, 'hour');
+      const days = Math.round(diff/86400);
+      if(Math.abs(days)<30) return rtf.format(days, 'day');
+      const mos = Math.round(diff/2592000);
+      if(Math.abs(mos)<12) return rtf.format(mos, 'month');
+      const yrs = Math.round(diff/31536000);
+      return rtf.format(yrs, 'year');
+    }
+
+    let valid = true, currentDate = new Date();
+
+    function createDiscordItems(ts) {
+      discordList.innerHTML = '';
+      formats.forEach(f => {
+        const div = document.createElement('div');
+        div.className = 'ts-item';
+        const txt = f.suffix === 'R'
+          ? getRelativeTime(currentDate)
+          : new Intl.DateTimeFormat('en-US', f.opts).format(currentDate);
+        const label = document.createElement('span');
+        label.textContent = txt;
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-copy';
+        div.append(label, icon);
+        if(!valid) {
+          div.classList.add('invalid');
+        } else {
+          div.addEventListener('click', () => {
+            const code = `<t:${ts}${f.suffix?':'+f.suffix:''}>`;
+            navigator.clipboard.writeText(code);
+            div.classList.add('copied');
+          });
+        }
+        discordList.append(div);
+      });
+    }
+
+    function updatePlaceholder(){
+      datePh.textContent = formatDate(new Date());
+      datePh.style.visibility = input.value.trim() ? 'hidden' : 'visible';
+    }
+
+    function updateAll(){
+      const v = input.value.trim();
+      currentDate = v ? parseDate(v) : new Date();
+      valid = !!currentDate;
+      const ts = valid ? Math.floor(currentDate.getTime()/1000) : '';
+
+      tsMain.querySelector('.label').textContent = valid ? ts : 'Invalid date';
+      tsMain.classList.toggle('invalid', !valid);
+      tsMain.onclick = valid
+        ? () => { navigator.clipboard.writeText(ts.toString()); tsMain.classList.add('copied'); }
+        : null;
+
+        discordList.classList.toggle('invalid', !valid);
+        createDiscordItems(ts);
+    }
+
+    input.addEventListener('input', () => { updatePlaceholder(); updateAll(); });
+    updatePlaceholder();
+    updateAll();
+  </script>
+</body>
+</html>
