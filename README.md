@@ -24,3 +24,10 @@ put in mm/dd/yyyy hh:mm:ss (am/pm optional) although only mm/dd is required and 
 - **why?**
 
 cause i was bored and i wanted a permanent solution to this not-really-a-problem-but-i-couldnt-care-less
+
+## version
+
+### 1.1
+- release date: 05/03/2025
+- added ok-ish mobile support
+- input can now have time - xx:xx, xx am/pm, xx:xx am/pm
