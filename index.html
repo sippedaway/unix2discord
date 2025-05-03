@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
     rel="stylesheet"
@@ -32,12 +32,15 @@
       font-family: 'Inter', sans-serif;
     }
     .container {
-      padding: 3rem;
+      padding: 2rem;
+      width: 90%;
+      max-width: 500px;
       background: var(--surface);
-      border-radius: 30px;
+      border-radius: 20px;
       display: flex;
       flex-direction: column;
       gap: 1rem;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
     }
     input {
       height: 2.75rem;
@@ -50,6 +53,9 @@
       outline: none;
       transition: border-color 0.2s;
       font-family: 'Inter';
+      width: 100%;
+      -webkit-appearance: none;
+      appearance: none;
     }
     input:focus { border-color: var(--accent); }
     .placeholder-date {
@@ -70,7 +76,9 @@
       cursor: pointer;
       transition: background 0.2s, border-color 0.2s;
       user-select: none;
-      width: 350px;
+      width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .ts-item:hover {
       background: var(--hover);
@@ -93,6 +101,7 @@
     }
     .ts-item:hover i { transform: scale(1.1); }
     .ts-item.copied i { color: #22c55e; }
+    .ts-item.copied { border-color: #22c55e; }
 
     #discord-list .ts-item.invalid {
         opacity: 0;
@@ -102,12 +111,33 @@
       grid-template-columns: repeat(2, 1fr);
       gap: 0.5rem;
       visibility: visible;
+      width: 100%;
+    }
+    
+    @media (max-width: 480px) {
+      .container {
+        background: none;
+        padding: 1.5rem;
+        width: 95%;
+      }
+      #discord-list {
+        grid-template-columns: 1fr;
+      }
+      .ts-item span {
+        max-width: 80%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      input {
+        font-size: 0.9rem;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <input id="dt-input" placeholder="MM/DD/YYYY" autocomplete="off" />
+    <input id="dt-input" placeholder="Input" autocomplete="off" />
     <div id="date-ph" class="placeholder-date"></div>
     <div id="ts-main" class="ts-item">
       <span class="label"></span><i class="fas fa-copy"></i>
@@ -136,22 +166,55 @@
       return pad(d.getMonth()+1)+'/'+pad(d.getDate())+'/'+d.getFullYear();
     }
     function parseDate(str){
-      const re = /^\s*(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?(?:\s+(\d{1,2})(?::(\d{2})(?::(\d{2}))?)?\s*(am|pm)?)?\s*$/i;
-      const m = str.match(re);
-      if(!m) return null;
-      let [,mm,dd,yy,hh,mi,ss,ap] = m;
+      const fullDateRegex = /^\s*(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?(?:\s+(\d{1,2})(?::(\d{2})(?::(\d{2}))?)?\s*(am|pm)?)?\s*$/i;
+      const timeOnly12hr = /^\s*(\d{1,2})(?::(\d{1,2})(?::(\d{2}))?)?\s*(am|pm)\s*$/i;
+      const timeOnly24hr = /^\s*(\d{1,2})(?::(\d{1,2})(?::(\d{2}))?)?\s*$/i;
+      
+      let match;
       const now = new Date();
-      const year = yy ? +yy : now.getFullYear();
-      let h = hh ? +hh : 0;
-      const minute = mi ? +mi : 0;
-      const second = ss ? +ss : 0;
-      if(ap){
+      
+      if ((match = str.match(fullDateRegex))) {
+        let [,mm,dd,yy,hh,mi,ss,ap] = match;
+        const year = yy ? +yy : now.getFullYear();
+        let h = hh ? +hh : 0;
+        const minute = mi ? +mi : 0;
+        const second = ss ? +ss : 0;
+        if(ap){
+          ap = ap.toLowerCase();
+          if(ap==='pm'&&h<12) h+=12;
+          if(ap==='am'&&h===12) h=0;
+        }
+        const d = new Date(year, +mm-1, +dd, h, minute, second);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      
+      else if ((match = str.match(timeOnly12hr))) {
+        let [,hh,mi,ss,ap] = match;
+        let h = +hh;
+        const minute = mi ? +mi : 0;
+        const second = ss ? +ss : 0;
+        
         ap = ap.toLowerCase();
         if(ap==='pm'&&h<12) h+=12;
         if(ap==='am'&&h===12) h=0;
+        
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, minute, second);
+        return isNaN(d.getTime()) ? null : d;
       }
-      const d = new Date(year, +mm-1, +dd, h, minute, second);
-      return isNaN(d.getTime()) ? null : d;
+      
+      else if ((match = str.match(timeOnly24hr))) {
+        let [,hh,mi,ss] = match;
+        const h = +hh;
+        if (h >= 24) return null;
+        
+        const minute = mi ? +mi : 0;
+        const second = ss ? +ss : 0;
+        
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, minute, second);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      
+      return null;
     }
     function getRelativeTime(date){
       const now = new Date();
@@ -193,6 +256,10 @@
             const code = `<t:${ts}${f.suffix?':'+f.suffix:''}>`;
             navigator.clipboard.writeText(code);
             div.classList.add('copied');
+            
+            setTimeout(() => {
+              div.classList.remove('copied');
+            }, 1500);
           });
         }
         discordList.append(div);
@@ -210,17 +277,36 @@
       valid = !!currentDate;
       const ts = valid ? Math.floor(currentDate.getTime()/1000) : '';
 
-      tsMain.querySelector('.label').textContent = valid ? ts : 'Invalid date';
+      tsMain.querySelector('.label').textContent = valid ? ts : 'Invalid date/time';
       tsMain.classList.toggle('invalid', !valid);
-      tsMain.onclick = valid
-        ? () => { navigator.clipboard.writeText(ts.toString()); tsMain.classList.add('copied'); }
-        : null;
+      
+      if (valid) {
+        tsMain.onclick = () => { 
+          navigator.clipboard.writeText(ts.toString()); 
+          tsMain.classList.add('copied'); 
+          
+          setTimeout(() => {
+            tsMain.classList.remove('copied');
+          }, 1500);
+        };
+      } else {
+        tsMain.onclick = null;
+      }
 
-        discordList.classList.toggle('invalid', !valid);
-        createDiscordItems(ts);
+      discordList.classList.toggle('invalid', !valid);
+      createDiscordItems(ts);
     }
 
     input.addEventListener('input', () => { updatePlaceholder(); updateAll(); });
+    
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.ts-item')) {
+        document.querySelectorAll('.ts-item.copied').forEach(el => {
+          el.classList.remove('copied');
+        });
+      }
+    });
+    
     updatePlaceholder();
     updateAll();
   </script>
